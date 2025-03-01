@@ -1,0 +1,90 @@
+# GCP Data Pipeline
+
+## Overview
+This project is an end-to-end data pipeline on Google Cloud Platform (GCP) that automates the ingestion, processing, and storage of CSV files into BigQuery. The pipeline integrates Google Cloud Storage, Cloud Functions, Pub/Sub, Cloud Composer (Apache Airflow), and Compute Engine.
+
+## Workflow
+1. A CSV file is uploaded to **Google Cloud Storage (GCS)**.
+2. A **Cloud Function** (`csv-to-bigquery`) is triggered to load data into BigQuery.
+3. The function sends a **Pub/Sub message** to trigger an **Airflow DAG**.
+4. The **DAG in Cloud Composer** performs post-processing steps in BigQuery.
+5. Logs and monitoring are enabled throughout the pipeline.
+
+## GCP Services Used
+- **Cloud Storage (GCS)**: Stores input CSV files.
+- **Cloud Functions**: Triggers on file uploads and loads data into BigQuery.
+- **BigQuery**: Stores structured data.
+- **Pub/Sub**: Triggers the DAG in Cloud Composer.
+- **Cloud Composer (Airflow DAGs)**: Manages additional transformations.
+- **Compute Engine (VM)**: Handles deployment and CI/CD automation.
+
+## Repository Structure
+```
+gcp-data-pipeline/
+├── dags/
+│   ├── airflow_monitoring.py
+│   ├── gcs_to_bigquery_dag.py
+├── cloud-run-functions/
+│   ├── main.py
+│   ├── requirements.txt
+├── README.md
+```
+
+## Deployment Instructions
+
+### 1. Clone Repository
+```sh
+git clone https://github.com/mylocalAPI/gcp-data-pipeline.git
+cd gcp-data-pipeline
+```
+
+### 2. Deploy Cloud Function
+```sh
+gcloud functions deploy csv-to-bigquery \
+    --region=us-central1 \
+    --runtime=python310 \
+    --trigger-resource=adventureworkbucket \
+    --trigger-event=google.storage.object.finalize \
+    --entry-point=csv_to_bigquery \
+    --source=cloud-run-functions/ \
+    --memory=256MB \
+    --timeout=60s \
+    --service-account=adventureworks@famous-palisade-452223-g4.iam.gserviceaccount.com
+```
+
+### 3. Deploy Airflow DAGs
+```sh
+gcloud composer environments storage dags import \
+    --environment=data-pipeline-airflow \
+    --location=us-central1 \
+    --source=dags/gcs_to_bigquery_dag.py
+```
+
+### 4. Verify Pipeline Execution
+- Upload a CSV file to `adventureworkbucket`.
+- Check Cloud Function execution logs:
+  ```sh
+  gcloud functions logs read csv-to-bigquery --region=us-central1
+  ```
+- Verify data in BigQuery:
+  ```sh
+  gcloud bigquery query --use_legacy_sql=false "SELECT * FROM `famous-palisade-452223-g4.mydataset.adventureworks_table` LIMIT 10"
+  ```
+- Monitor DAG execution in Cloud Composer.
+
+## CI/CD Pipeline
+1. **GitHub Actions / Manual Git Process**:
+   ```sh
+   git add .
+   git commit -m "Updated Cloud Functions and DAGs"
+   git push origin main
+   ```
+2. **Cloud Deployment via VM**
+   ```sh
+   gcloud functions deploy ...  # Redeploy updated function
+   gcloud composer environments storage dags import ...  # Update DAGs
+   ```
+
+## Summary
+This GCP data pipeline automates ETL workflows using serverless technologies, providing scalability, automation, and monitoring capabilities. 🚀
+
