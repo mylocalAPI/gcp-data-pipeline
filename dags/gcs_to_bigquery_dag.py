@@ -9,14 +9,14 @@ import json
 DEFAULT_ARGS = {
     "owner": "airflow",
     "depends_on_past": False,
-    "start_date": datetime(2025, 2, 28),  # Adjust to the current date
+    "start_date": datetime(2025, 2, 28),
     "retries": 1,
     "retry_delay": timedelta(minutes=5),
 }
 
-# ✅ Updated with your details
+
 GCP_PROJECT_ID = "famous-palisade-452223-g4"
-BUCKET_NAME = "adevntureworkbucket"  # Fixed spelling mistake
+BUCKET_NAME = "adevntureworkbucket"
 DATASET_NAME = "mydataset"
 TABLE_NAME = "adventureworks_table"
 PUBSUB_SUBSCRIPTION = "trigger-airflow-sub"
@@ -24,7 +24,7 @@ PUBSUB_SUBSCRIPTION = "trigger-airflow-sub"
 def extract_filename_from_pubsub(**kwargs):
     """Extracts the filename from the Pub/Sub message."""
     ti = kwargs["ti"]
-    messages = ti.xcom_pull(task_ids="wait_for_pubsub_message")  # Get message from previous task
+    messages = ti.xcom_pull(task_ids="wait_for_pubsub_message")
     
     if messages and isinstance(messages, list) and len(messages) > 0:
         message_data = json.loads(messages[0]['message']['data'])  # Decode message data
@@ -37,11 +37,11 @@ def extract_filename_from_pubsub(**kwargs):
 with DAG(
     dag_id="gcs_to_bigquery_dag",
     default_args=DEFAULT_ARGS,
-    schedule_interval=None,  # ✅ No fixed schedule, triggered by Pub/Sub
+    schedule_interval=None,  # No fixed schedule, triggered by Pub/Sub
     catchup=False
 ) as dag:
 
-    # ✅ Step 1: Wait for a Pub/Sub message
+    # Step 1: Wait for a Pub/Sub message
     wait_for_pubsub_message = PubSubPullOperator(
         task_id="wait_for_pubsub_message",
         project_id=GCP_PROJECT_ID,
@@ -50,14 +50,14 @@ with DAG(
         ack_messages=True,
     )
 
-    # ✅ Step 2: Extract file name from Pub/Sub message
+    #  Step 2: Extract file name from Pub/Sub message
     extract_file_name = PythonOperator(
         task_id="extract_file_name",
         python_callable=extract_filename_from_pubsub,
         provide_context=True
     )
 
-    # ✅ Step 3: Load CSV into BigQuery dynamically
+    #  Step 3: Load CSV into BigQuery dynamically
     load_csv_to_bigquery = GCSToBigQueryOperator(
         task_id="load_csv_to_bigquery",
         bucket=BUCKET_NAME,
@@ -69,5 +69,5 @@ with DAG(
         write_disposition="WRITE_APPEND",
     )
 
-    # ✅ Define Task Dependencies
+    #  Define Task Dependencies
     wait_for_pubsub_message >> extract_file_name >> load_csv_to_bigquery
